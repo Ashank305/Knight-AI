@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlanStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskCategory {
+  DSA
+  CORE_CS
+  LANGUAGE
+  SYSTEM_DESIGN
+  PROJECTS
+  RESUME
+  BEHAVIORAL
+  MOCK_INTERVIEW
+  REVISION
+  OTHER
+}
+
+enum TaskPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum ActivityType {
+  COMPLETED
+  REOPENED
+  UPDATED
+  SKIPPED
+}
+
+model User {
+  id           String             @id @default(uuid())
+  name         String
+  email        String             @unique
+  passwordHash String
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  profile      CandidateProfile?
+  plans        PreparationPlan[]
+  resumes      ResumeDocument[]
+
+  @@map("users")
+}
+
+model CandidateProfile {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  educationLevel      String?
+  experienceLevel     String?
+  targetRole          String?
+  primaryLanguages    String[] @default([])
+  existingSkills      String[] @default([])
+  confidenceAreas     String[] @default([])
+  improvementAreas    String[] @default([])
+  dailyStudyHours     Float    @default(3.0)
+  preferredDays       String[] @default([])
+  preferredTaskDuration Int    @default(60) // minutes
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("candidate_profiles")
+}
+
+model PreparationPlan {
+  id                String            @id @default(uuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title             String
+  targetCompany     String
+  targetRole        String
+  applicationSource String            @default("direct") // referral, direct, campus, internship, other
+  interviewType     String            @default("mixed")  // coding, technical, behavioral, system_design, mixed
+  interviewDate     DateTime?
+  planningHorizon   Int               @default(30) // days
+  dailyAvailability Float             @default(3.0) // hours
+  goals             String[]          @default([])
+  skillGaps         String[]          @default([])
+  phases            Json?             // Array of phase objects { name, focus, startDay, endDay }
+  status            PlanStatus        @default(ACTIVE)
+  isDemoPlan        Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  tasks             PreparationTask[]
+
+  @@index([userId])
+  @@map("preparation_plans")
+}
+
+model PreparationTask {
+  id                 String          @id @default(uuid())
+  planId             String
+  plan               PreparationPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  title              String
+  description        String
+  category           TaskCategory    @default(OTHER)
+  priority           TaskPriority    @default(MEDIUM)
+  status             TaskStatus      @default(TODO)
+  plannedDate        DateTime
+  estimatedDuration  Int             @default(60) // in minutes
+  completionCriteria String
+  notes              String?
+  resourceLinks      String[]        @default([])
+  order              Int             @default(0)
+  completedAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  activities         TaskActivity[]
+
+  @@index([planId])
+  @@index([plannedDate])
+  @@index([status])
+  @@map("preparation_tasks")
+}
+
+model TaskActivity {
+  id           String          @id @default(uuid())
+  taskId       String
+  task         PreparationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  activityType ActivityType
+  timestamp    DateTime        @default(now())
+  metadata     Json?
+
+  @@index([taskId])
+  @@index([timestamp])
+  @@map("task_activities")
+}
+
+model ResumeDocument {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalName  String
+  mimeType      String
+  sizeBytes     Int
+  extractedText String?
+  storageKey    String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@map("resume_documents")
+}
